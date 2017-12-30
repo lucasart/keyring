@@ -1,3 +1,4 @@
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <map>
@@ -36,7 +37,7 @@ void generate()
     std::cout << '\n';
 }
 
-void view(std::map<std::string, std::string>& keyring)
+void view(const std::map<std::string, std::string>& keyring)
 {
     for (auto& key: keyring)
         std::cout << key.first << '\t' << key.second << '\n';
@@ -123,19 +124,8 @@ void password_digest(std::string& password, uint64_t digest[2])
         xoroshiro128p(digest);
 }
 
-void cipher(const char *src, char *dst, int size, uint64_t digest[2])
-{
-    uint64_t key;
-
-    for (int i = 0; i < size; i++) {
-        if (i % 8 == 0)
-            key = xoroshiro128p(digest);
-
-        dst[i] = src[i] ^ (key >> (8 * (i % 8)));
-    }
-}
-
-void save(std::map<std::string, std::string>& keyring)
+void save(const std::map<std::string, std::string>& keyring)
+// FIXME: only works on Little Endian machines
 {
     std::string s, fileName, password;
     std::cin >> fileName >> password;
@@ -146,12 +136,15 @@ void save(std::map<std::string, std::string>& keyring)
     uint64_t digest[2];
     password_digest(password, digest);
 
-    char *buffer = new char[s.length()];
+    const int blocks = (s.length() + 7) / 8;
+    uint64_t *buffer = new uint64_t[blocks];
+    std::memcpy(buffer, s.c_str(), s.length());
 
-    cipher(s.c_str(), buffer, s.length(), digest);
+    for (int i = 0; i < blocks; i++)
+        buffer[i] ^= xoroshiro128p(digest);
 
     std::ofstream os(fileName, std::ios::binary);
-    os.write(buffer, s.length());
+    os.write(reinterpret_cast<char *>(buffer), s.length());
 
     delete[] buffer;
 }
