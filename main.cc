@@ -1,40 +1,15 @@
-#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <map>
 #include <string>
 
-char decode_char(uint8_t b)
-{
-    return b < 10 ? b + '0'
-        : b < 36 ? b - 10 + 'A'
-        : b < 62 ? b - 36 + 'a'
-        : b == 62 ? '+'
-        : '-';
-}
-
-uint8_t encode_char(char c)
-{
-    return '0' <= c && c <= '9' ? c
-        : 'A' <= c && c <= 'Z' ? c - 'A' + 10
-        : 'a' <= c && c <= 'z' ? c - 'a' + 36
-        : c == '+' ? 62
-        : 63;
-}
+#include "crypto.h"
 
 void generate()
 {
     int n;
     std::cin >> n;
-    std::ifstream rng("/dev/urandom", std::ios::binary);
-
-    for (int i = 0; i < n; i++) {
-        uint8_t b;
-        rng >> b;
-        std::cout << decode_char(b >> 2);
-    }
-
-    std::cout << '\n';
+    std::cout << generate_password(n) << '\n';
 }
 
 void view(const std::map<std::string, std::string>& keyring)
@@ -76,54 +51,6 @@ void remove(std::map<std::string, std::string>& keyring)
         keyring.erase(key);
 }
 
-uint64_t rotl(uint64_t x, int k)
-{
-    return (x << k) | (x >> (64 - k));
-}
-
-uint64_t xoroshiro128p(uint64_t s[2])
-{
-    const uint64_t s0 = s[0];
-    uint64_t s1 = s[1];
-    const uint64_t result = s0 + s1;
-
-    s1 ^= s0;
-    s[0] = rotl(s0, 55) ^ s1 ^ (s1 << 14);
-    s[1] = rotl(s1, 36);
-
-    return result;
-}
-
-void password_digest(std::string& password, uint64_t digest[2])
-{
-    int bit = 0;
-    digest[0] = digest[1] = 0;
-
-    // Spread the password across 128-bit, using 6-bit per char
-    for (char c: password) {
-        const uint8_t b = encode_char(c);
-
-        if (bit < 64) {
-            digest[0] |= b << bit;
-
-            if (bit == 60)  // overlapping
-                digest[1] |= b >> 4;
-        } else
-            digest[1] |= b << (bit - 64);
-
-        bit += 6;
-
-        if (bit >= 128)  // guard against oversized shift (undefined)
-            break;
-    }
-
-    // Password will often not occupy the full 128 bits (that would take 22 character password).
-    // Also, human chosen passwords can have weak entropy. So we need to run a few rounds of 128-bit
-    // PRNG, to maximize entropy.
-    for (int i = 0; i < 16; i++)
-        xoroshiro128p(digest);
-}
-
 void save(const std::map<std::string, std::string>& keyring)
 // FIXME: only works on Little Endian machines
 {
@@ -133,18 +60,14 @@ void save(const std::map<std::string, std::string>& keyring)
     for (auto& key: keyring)
         s += key.first + "\t" + key.second + "\t";
 
-    uint64_t digest[2];
-    password_digest(password, digest);
+    ChaCha c;
+    c.init(password);
 
-    const int blocks = (s.length() + 7) / 8;
-    uint64_t *buffer = new uint64_t[blocks];
-    std::memcpy(buffer, s.c_str(), s.length());
-
-    for (int i = 0; i < blocks; i++)
-        buffer[i] ^= xoroshiro128p(digest);
+    char *buffer = new char[s.length()];
+    c.cipher(s.c_str(), buffer, s.length());
 
     std::ofstream os(fileName, std::ios::binary);
-    os.write(reinterpret_cast<char *>(buffer), s.length());
+    os.write(buffer, s.length());
 
     delete[] buffer;
 }
