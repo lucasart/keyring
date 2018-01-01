@@ -2,6 +2,7 @@
 #include <iostream>
 #include <map>
 #include <string>
+#include <sstream>
 
 #include "crypto.h"
 
@@ -52,13 +53,12 @@ void remove(std::map<std::string, std::string>& keyring)
 }
 
 void save(const std::map<std::string, std::string>& keyring)
-// FIXME: only works on Little Endian machines
 {
     std::string s, fileName, password;
     std::cin >> fileName >> password;
 
     for (auto& key: keyring)
-        s += key.first + "\t" + key.second + "\t";
+        s += key.first + "\t" + key.second + "\n";
 
     ChaCha c;
     c.init(password);
@@ -66,6 +66,32 @@ void save(const std::map<std::string, std::string>& keyring)
 
     std::ofstream os(fileName, std::ios::binary);
     os.write(s.c_str(), s.length());
+}
+
+void load(std::map<std::string, std::string>& keyring)
+{
+    std::string fileName, password;
+    std::cin >> fileName >> password;
+
+    std::ifstream is(fileName, std::ios::binary);
+    is.seekg(0, is.end);
+    const auto n = is.tellg();
+    is.seekg(0, is.beg);
+
+    std::string s;
+    s.resize(n);
+    is.read(&s[0], n);
+
+    ChaCha c;
+    c.init(password);
+    c.cipher(&s[0], s.length());
+
+    std::istringstream ss(s);
+    std::string line;
+    std::size_t pos;
+
+    while (std::getline(ss, line) && (pos = line.find('\t')) != std::string::npos)
+        keyring[line.substr(0, pos)] = line.substr(pos + 1, line.length() - pos - 1);
 }
 
 int main()
@@ -86,6 +112,8 @@ int main()
             remove(keyring);
         else if (s == "save")
             save(keyring);
+        else if (s == "load")
+            load(keyring);
         else if (s == "quit")
             break;
         else
