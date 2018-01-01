@@ -16,7 +16,7 @@ std::string generate_password(int n);
 class ChaCha {
 public:
     void init(const std::string& password);
-    void cipher(const char *src, char *dst, size_t n);
+    void cipher(char *buffer, size_t n);
 
 private:
     void quarter_round(int a, int b, int c, int d);

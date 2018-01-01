@@ -62,14 +62,10 @@ void save(const std::map<std::string, std::string>& keyring)
 
     ChaCha c;
     c.init(password);
-
-    char *buffer = new char[s.length()];
-    c.cipher(s.c_str(), buffer, s.length());
+    c.cipher(&s[0], s.length());
 
     std::ofstream os(fileName, std::ios::binary);
-    os.write(buffer, s.length());
-
-    delete[] buffer;
+    os.write(s.c_str(), s.length());
 }
 
 int main()

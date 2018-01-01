@@ -96,7 +96,7 @@ void ChaCha::init(const std::string& password)
         x[i] = xoroshiro128p(key) >> 32;
 }
 
-void ChaCha::cipher(const char *src, char *dst, size_t n)
+void ChaCha::cipher(char *buffer, size_t n)
 {
     int j = 0;
 
@@ -104,9 +104,9 @@ void ChaCha::cipher(const char *src, char *dst, size_t n)
         if (j == 0)
             twelve_rounds();
 
-        *reinterpret_cast<uint32_t *>(dst) = *reinterpret_cast<const uint32_t *>(src) ^ x[j];
+        *reinterpret_cast<uint32_t *>(buffer) ^= x[j];
 
-        src += 4, dst += 4;
+        buffer += 4;
         j = (j + 1) % 16;
     }
 
@@ -114,8 +114,7 @@ void ChaCha::cipher(const char *src, char *dst, size_t n)
         if (j == 0)
             twelve_rounds();
 
-        *dst = *src ^ char(x[j] >> (8 * i));
-        src++, dst++;
+        *buffer++ ^= x[j] >> (8 * i);
     }
 }
 
