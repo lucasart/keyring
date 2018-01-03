@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <fstream>
 #include "crypto.h"
 
@@ -7,51 +8,6 @@ uint64_t rotl(uint64_t x, int k)
 {
     return (x << k) | (x >> (64 - k));
 }
-
-uint64_t xoroshiro128p(uint64_t s[2])
-{
-    const uint64_t s0 = s[0];
-    uint64_t s1 = s[1];
-    const uint64_t result = s0 + s1;
-
-    s1 ^= s0;
-    s[0] = rotl(s0, 55) ^ s1 ^ (s1 << 14);
-    s[1] = rotl(s1, 36);
-
-    return result;
-}
-
-void password_to_key(const std::string& password, uint64_t key[2])
-{
-    int bit = 0;
-    key[0] = key[1] = 0;
-
-    // Spread the password across 128-bit, using 6-bit per char
-    for (char c: password) {
-        const uint8_t b = encode_char(c);
-
-        if (bit < 64) {
-            key[0] |= b << bit;
-
-            if (bit == 60)  // overlapping
-                key[1] |= b >> 4;
-        } else
-            key[1] |= b << (bit - 64);
-
-        bit += 6;
-
-        if (bit >= 128)  // guard against oversized shift (undefined)
-            break;
-    }
-
-    // Password will often not occupy the full 128 bits (that would take 22 character password).
-    // Also, human chosen passwords can have weak entropy. So we need to run a few rounds of 128-bit
-    // PRNG, to maximize entropy.
-    for (int i = 0; i < 16; i++)
-        xoroshiro128p(key);
-}
-
-}  // namespace
 
 char decode_char(uint8_t b)
 {
@@ -71,6 +27,8 @@ uint8_t encode_char(char c)
         : 63;
 }
 
+}  // namespace
+
 std::string generate_password(int n)
 {
     std::string password;
@@ -87,13 +45,19 @@ std::string generate_password(int n)
 
 void ChaCha::init(const std::string& password)
 {
-    // Make a strong 128-bit key from password
-    uint64_t key[2];
-    password_to_key(password, key);
+    std::fill_n(&x[0], 16, 0);
+    int bit = 0;
 
-    // Initialize ChaCha with key
-    for (int i = 0; i < 16; i++)
-        x[i] = xoroshiro128p(key) >> 32;
+    for (char c: password) {
+        const uint32_t b = encode_char(c);
+
+        x[bit / 32] |= b << (bit % 32);
+
+        if ((bit + 6) % 32 < bit % 32)
+            x[(bit + 6) / 32] |= b >> (32 - (bit % 32));
+
+        bit += 6;
+    }
 }
 
 void ChaCha::cipher(char *buffer, size_t n)
@@ -102,7 +66,7 @@ void ChaCha::cipher(char *buffer, size_t n)
 
     for (size_t i = 0; i < n / 4; i++) {
         if (j == 0)
-            twelve_rounds();
+            twenty_rounds();
 
         *reinterpret_cast<uint32_t *>(buffer) ^= x[j];
 
@@ -112,7 +76,7 @@ void ChaCha::cipher(char *buffer, size_t n)
 
     for (size_t i = 0; i < n % 4; i++) {
         if (j == 0)
-            twelve_rounds();
+            twenty_rounds();
 
         *buffer++ ^= x[j] >> (8 * i);
     }
@@ -138,8 +102,8 @@ void ChaCha::double_round()
     quarter_round(3, 4, 9, 14);
 }
 
-void ChaCha::twelve_rounds()
+void ChaCha::twenty_rounds()
 {
-    for (int i = 0; i < 6; i++)
+    for (int i = 0; i < 10; i++)
         double_round();
 }
