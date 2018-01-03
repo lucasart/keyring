@@ -60,11 +60,15 @@ void save(const std::map<std::string, std::string>& keyring)
     for (auto& key: keyring)
         s += key.first + "\t" + key.second + "\n";
 
-    ChaCha c;
-    c.init(password);
+    uint64_t nonce[4];
+    std::ifstream rng("/dev/urandom", std::ios::binary);
+    rng.read((char *)&nonce[0], sizeof(nonce));
+
+    ChaCha c(password, nonce);
     c.cipher(&s[0], s.length());
 
     std::ofstream os(fileName, std::ios::binary);
+    os.write((char *)&nonce[0], sizeof(nonce));
     os.write(s.c_str(), s.length());
 }
 
@@ -75,15 +79,18 @@ void load(std::map<std::string, std::string>& keyring)
 
     std::ifstream is(fileName, std::ios::binary);
     is.seekg(0, is.end);
-    const auto n = is.tellg();
+    auto n = is.tellg();
     is.seekg(0, is.beg);
+
+    uint64_t nonce[4];
+    is.read((char *)&nonce[0], sizeof(nonce));
+    n -= sizeof(nonce);
 
     std::string s;
     s.resize(n);
     is.read(&s[0], n);
 
-    ChaCha c;
-    c.init(password);
+    ChaCha c(password, nonce);
     c.cipher(&s[0], s.length());
 
     std::istringstream ss(s);

@@ -4,9 +4,9 @@
 
 namespace {
 
-uint64_t rotl(uint64_t x, int k)
+uint32_t rotl(uint32_t x, int k)
 {
-    return (x << k) | (x >> (64 - k));
+    return (x << k) | (x >> (32 - k));
 }
 
 char decode_char(uint8_t b)
@@ -34,18 +34,17 @@ std::string generate_password(int n)
     std::string password;
     std::ifstream rng("/dev/urandom", std::ios::binary);
 
-    for (int i = 0; i < n; i++) {
-        uint8_t b;
-        rng >> b;
-        password += decode_char(b >> 2);
-    }
+    for (int i = 0; i < n; i++)
+        password += decode_char(rng.get() >> 2);
 
     return password;
 }
 
-void ChaCha::init(const std::string& password)
+ChaCha::ChaCha(const std::string& password, uint64_t nonce[4])
 {
-    std::fill_n(&x[0], 16, 0);
+    std::fill_n(&qw[0], 4, 0);  // clear first half (for password)
+    std::copy_n(&nonce[0], 4, &qw[4]);  // fill second half with nonce
+
     int bit = 0;
 
     for (char c: password) {
@@ -57,28 +56,35 @@ void ChaCha::init(const std::string& password)
             x[(bit + 6) / 32] |= b >> (32 - (bit % 32));
 
         bit += 6;
+
+        if (bit >= 256)
+            break;
     }
 }
 
 void ChaCha::cipher(char *buffer, size_t n)
+// Careful with this code!
+// - alignment: buffer is assumed to be 8-byte aligned. No checking is done.
+// - endianness: encryption/decryption must be done on machines using the same endianness (everyone
+//   uses little-endian nowadays, but you never know...).
 {
     int j = 0;
 
-    for (size_t i = 0; i < n / 4; i++) {
+    for (size_t i = 0; i < n / 8; i++) {
         if (j == 0)
             twenty_rounds();
 
-        *reinterpret_cast<uint32_t *>(buffer) ^= x[j];
+        *(uint64_t *)(buffer) ^= qw[j];
 
-        buffer += 4;
-        j = (j + 1) % 16;
+        buffer += 8;
+        j = (j + 1) % 8;
     }
 
-    for (size_t i = 0; i < n % 4; i++) {
+    for (size_t i = 0; i < n % 8; i++) {
         if (j == 0)
             twenty_rounds();
 
-        *buffer++ ^= x[j] >> (8 * i);
+        *buffer++ ^= qw[j] >> (8 * i);
     }
 }
 

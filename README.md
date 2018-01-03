@@ -1,12 +1,17 @@
 ## Keyring
 
-Keyring is a safe and easy to use keyring to store all your logins and passwords. It
-allows you to load/save your keyring from/to encrypted file(s).
+Keyring is a password manager. It allows you to load/save all your logins and
+passwords from/to encrypted file(s).
 
-Only runs on Linux and MacOSX for the moment. Sorry.
+Uses state of the art [ChaCha](https://en.wikipedia.org/wiki/Salsa20#ChaCha_variant)
+by Daniel Bernstein, allowing practically unlimited encryption strength (up to 256-bits).
+
+Of course, encryption strength can only be as good as [password strength](https://en.wikipedia.org/wiki/Password_strength).
+So don't be a dumb ass: choose a strong pasword, don't write it anywhere, and don't tell anyone (not even your mum).
 
 ### How to compile ?
 
+Linux only for now. Should compile the same way on other POSIX systems (including MacOSX), but I haven't tested.
 - GCC: `g++ -o ./keyring -std=c++11 -DNDEBUG -O3 -flto -s *.cc`
 - Clang: `clang++ -o ./keyring -std=c++11 -DNDEBUG -O3 -flto -s *.cc`
 
@@ -50,14 +55,14 @@ Now let's decrypt this keyring file, make some modifications, and save changes:
 $ ./keyring
 load ./secret ajKVew5NFI
 view
-gmail	email=john.doe@gmail.com,pwd=v5lYT1UzDL
-hsbc	pwd1=ezVAyyOO1U,pwd2=QMezpaXrG5,phone_pin=654827
-yahoo	email=johnDoe@yahoo.com,pwd=dTVl4Q0l+g
+> gmail	email=john.doe@gmail.com,pwd=v5lYT1UzDL
+> hsbc	pwd1=ezVAyyOO1U,pwd2=QMezpaXrG5,phone_pin=654827
+> yahoo	email=johnDoe@yahoo.com,pwd=dTVl4Q0l+g
 modify yahoo email=johnDoe@yahoo.com,pwd=sk3x9(8*             
 remove hsbc
 view
-gmail	email=john.doe@gmail.com,pwd=v5lYT1UzDL
-yahoo	email=johnDoe@yahoo.com,pwd=sk3x9(8*
+> gmail	email=john.doe@gmail.com,pwd=v5lYT1UzDL
+> yahoo	email=johnDoe@yahoo.com,pwd=sk3x9(8*
 save ./secret ajKVew5NFI
 quit
 ```

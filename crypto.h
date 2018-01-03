@@ -10,7 +10,7 @@ std::string generate_password(int n);
 // ChaCha 12-rounds, using 128-bit keys (ie. up to 22 character passwords)
 class ChaCha {
 public:
-    void init(const std::string& password);
+    ChaCha(const std::string& password, uint64_t nonce[4]);
     void cipher(char *buffer, size_t n);
 
 private:
@@ -18,5 +18,8 @@ private:
     void double_round();
     void twenty_rounds();
 
-    uint32_t x[16];
+    union {
+        uint32_t x[16];
+        uint64_t qw[8];
+    };
 };
