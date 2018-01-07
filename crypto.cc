@@ -33,6 +33,8 @@ std::string generate_password(int n)
 {
     std::string password;
     std::ifstream rng("/dev/urandom", std::ios::binary);
+    if (rng.fail())
+        throw("cannot read from: /dev/urandom");
 
     for (int i = 0; i < n; i++)
         password += decode_char(rng.get() >> 2);

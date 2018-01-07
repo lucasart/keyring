@@ -62,14 +62,22 @@ void save(const std::map<std::string, std::string>& keyring)
 
     uint64_t nonce[4];
     std::ifstream rng("/dev/urandom", std::ios::binary);
+    if (!rng)
+        throw("cannot open /dev/urandom");
+
     rng.read((char *)&nonce[0], sizeof(nonce));
 
     ChaCha c(password, nonce);
     c.cipher(&s[0], s.length());
 
     std::ofstream os(fileName, std::ios::binary);
+    if (!os)
+        throw(std::string("cannot open output file ") + fileName);
+
     os.write((char *)&nonce[0], sizeof(nonce));
     os.write(s.c_str(), s.length());
+    if (!os)
+        throw(std::string("cannot write to output file ") + fileName);
 }
 
 void load(std::map<std::string, std::string>& keyring)
@@ -78,6 +86,9 @@ void load(std::map<std::string, std::string>& keyring)
     std::cin >> fileName >> password;
 
     std::ifstream is(fileName, std::ios::binary);
+    if (is.fail())
+        throw(std::string("cannot open input file ") + fileName);
+
     is.seekg(0, is.end);
     auto n = is.tellg();
     is.seekg(0, is.beg);
@@ -89,6 +100,8 @@ void load(std::map<std::string, std::string>& keyring)
     std::string s;
     s.resize(n);
     is.read(&s[0], n);
+    if (!is)
+        throw(std::string("cannot read from input file ") + fileName);
 
     ChaCha c(password, nonce);
     c.cipher(&s[0], s.length());
@@ -107,23 +120,27 @@ int main()
     std::map<std::string, std::string> keyring;
 
     while (std::cin >> s) {
-        if (s == "generate")
-            generate();
-        else if (s == "view")
-            view(keyring);
-        else if (s == "add")
-            add(keyring);
-        else if (s == "modify")
-            modify(keyring);
-        else if (s == "remove")
-            remove(keyring);
-        else if (s == "save")
-            save(keyring);
-        else if (s == "load")
-            load(keyring);
-        else if (s == "quit")
-            break;
-        else
-            std::cout << "unrecognized command '" << s << "'\n";
+        try {
+            if (s == "generate")
+                generate();
+            else if (s == "view")
+                view(keyring);
+            else if (s == "add")
+                add(keyring);
+            else if (s == "modify")
+                modify(keyring);
+            else if (s == "remove")
+                remove(keyring);
+            else if (s == "save")
+                save(keyring);
+            else if (s == "load")
+                load(keyring);
+            else if (s == "quit")
+                break;
+            else
+                std::cout << "unrecognized command '" << s << "'\n";
+        } catch (std::string& s) {
+            std::cout << s << '\n';
+        }
     }
 }
